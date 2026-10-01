@@ -1,0 +1,8 @@
+.DS_Store
+# Raw Steam depots from download_depots.sh: original game data, never committed.
+depots/
+# Raw third-party sources (uncensored German, community voice-overs): never committed.
+sources/
+# Assembled packs and their release zips: published as GitHub release assets.
+GO_Mac_Locale_*/
+GO_Mac_Locale_*.zip
