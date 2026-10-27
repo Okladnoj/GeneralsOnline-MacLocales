@@ -53,6 +53,13 @@ LOCALES = {
     "tchinese": {"language": "Chinese", "packageVersion": 1},
     "polish": {"language": "Polish", "packageVersion": 1},
     "brazilian": {"language": "Brazilian", "packageVersion": 1},
+    "russian": {
+        "language": "Russian",
+        "packageVersion": 1,
+        "sourceLanguage": "English",
+        "zeroHourSource": os.path.join("sources", "russian_raptor", "Command and Conquer Generals Zero Hour"),
+        "generalsSource": os.path.join("sources", "russian_raptor", "Command and Conquer Generals"),
+    },
 }
 
 ARCHIVE_KINDS = (
@@ -76,6 +83,7 @@ class GameOptions:
     deferred_sound_names: frozenset = frozenset()
     drop_sounds: bool = False
     match_loudness: bool = False
+    source_language: str = None
 
 
 @dataclass
@@ -289,14 +297,15 @@ def base_name(entry_name):
 
 
 def collect_game(steam, language, directory, suffix, baseline, archive_name, cache, options):
-    source_dirs = language_dirs(language)
+    source_language = options.source_language or language
+    source_dirs = language_dirs(source_language)
     pack = GamePack(archive_name, [], {}, {})
     sound_names = set()
 
     for kind, prefix in ARCHIVE_KINDS:
         pack.counts[kind] = 0
         pack.totals[kind] = 0
-        path = find_file(directory, archive_candidates(prefix, language, suffix))
+        path = find_file(directory, archive_candidates(prefix, source_language, suffix))
         if not path:
             continue
 
@@ -371,7 +380,9 @@ def collect_movies(steam):
 def collect(steam, baselines, cache):
     spec = LOCALES[steam]
     language = spec["language"]
-    depot = os.path.join(DEPOTS, steam)
+    source_language = spec.get("sourceLanguage")
+    zero_hour_source = spec.get("zeroHourSource")
+    depot = os.path.join(ROOT, zero_hour_source) if zero_hour_source else os.path.join(DEPOTS, steam)
     if not os.path.isdir(depot):
         raise SystemExit(f"missing depot: {depot} — run ./download_depots.sh {steam}")
 
@@ -382,14 +393,17 @@ def collect(steam, baselines, cache):
 
     generals = collect_game(steam, language, generals_dir, "", baselines["generals"],
                             f"GOLocale{language}.big", cache,
-                            GameOptions(match_loudness=spec.get("matchEnglishLoudness", False)))
+                            GameOptions(match_loudness=spec.get("matchEnglishLoudness", False),
+                                        source_language=source_language))
     generals.source = generals_source or "depot"
 
     deferred = generals.sound_names if spec.get("zeroHourDefersBaseVoices") else frozenset()
     zero_hour = collect_game(steam, language, depot, "ZH", baselines["zero_hour"],
                              f"GOLocale{language}ZH.big", cache,
                              GameOptions(deferred_sound_names=deferred,
-                                         drop_sounds=spec.get("zeroHourDropsOwnVoices", False)))
+                                         drop_sounds=spec.get("zeroHourDropsOwnVoices", False),
+                                         source_language=source_language))
+    zero_hour.source = zero_hour_source or "depot"
     movies, movies_total = collect_movies(steam)
 
     return LocalePack(steam, language, spec["packageVersion"], zero_hour, generals, movies, movies_total)
